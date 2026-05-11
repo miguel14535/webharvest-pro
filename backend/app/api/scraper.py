@@ -1,32 +1,25 @@
-from fastapi import APIRouter, Depends
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 
+import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
+from tempfile import NamedTemporaryFile
 
 from openpyxl import Workbook
-from tempfile import NamedTemporaryFile
 
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
-import requests
-
 from app.services.database import get_db
 from app.models.scraping_history import ScrapingHistory
 
-router = APIRouter(
-    prefix="/api/scraper",
-    tags=["Scraper"]
-)
+router = APIRouter()
 
 
 @router.get("/scrape")
-def scrape(
-    url: str,
-    db: Session = Depends(get_db)
-):
+def scrape(url: str, db: Session = Depends(get_db)):
 
     try:
 
@@ -50,44 +43,30 @@ def scrape(
 
         title = (
             soup.title.string.strip()
-            if soup.title
+            if soup.title and soup.title.string
             else "Sem título"
         )
-
-        description = ""
 
         description_tag = soup.find(
             "meta",
             attrs={"name": "description"}
         )
 
-        if description_tag:
-            description = description_tag.get(
-                "content",
-                ""
-            )
+        description = (
+            description_tag.get("content", "")
+            if description_tag
+            else ""
+        )
 
-        links = []
+        links = [
+            urljoin(url, a["href"])
+            for a in soup.find_all("a", href=True)
+        ]
 
-        for a in soup.find_all("a", href=True):
-
-            href = urljoin(
-                url,
-                a["href"]
-            )
-
-            links.append(href)
-
-        images = []
-
-        for img in soup.find_all("img", src=True):
-
-            src = urljoin(
-                url,
-                img["src"]
-            )
-
-            images.append(src)
+        images = [
+            urljoin(url, img["src"])
+            for img in soup.find_all("img", src=True)
+        ]
 
         headings = {
             "h1": [
@@ -103,20 +82,20 @@ def scrape(
             "h3": [
                 h.get_text(strip=True)
                 for h in soup.find_all("h3")
-            ],
+            ]
         }
 
-        history_item = ScrapingHistory(
+        item = ScrapingHistory(
             url=url,
             title=title
         )
 
-        db.add(history_item)
+        db.add(item)
         db.commit()
-        db.refresh(history_item)
+        db.refresh(item)
 
         return {
-            "id": history_item.id,
+            "id": item.id,
             "url": url,
             "title": title,
             "description": description,
@@ -127,11 +106,12 @@ def scrape(
             "images": images[:20]
         }
 
-    except Exception as e:
+    except Exception as error:
 
-        return {
-            "error": str(e)
-        }
+        raise HTTPException(
+            status_code=400,
+            detail=str(error)
+        )
 
 
 @router.get("/history")
@@ -139,13 +119,11 @@ def get_history(
     db: Session = Depends(get_db)
 ):
 
-    history = db.query(
+    return db.query(
         ScrapingHistory
     ).order_by(
         ScrapingHistory.id.desc()
     ).all()
-
-    return history
 
 
 @router.delete("/history/{item_id}")
@@ -161,9 +139,11 @@ def delete_history_item(
     ).first()
 
     if not item:
-        return {
-            "error": "Item não encontrado"
-        }
+
+        raise HTTPException(
+            status_code=404,
+            detail="Item não encontrado"
+        )
 
     db.delete(item)
     db.commit()
@@ -171,6 +151,36 @@ def delete_history_item(
     return {
         "message": "Item deletado com sucesso"
     }
+
+
+@router.get("/export/json")
+def export_history_json(
+    db: Session = Depends(get_db)
+):
+
+    history = db.query(
+        ScrapingHistory
+    ).order_by(
+        ScrapingHistory.id.desc()
+    ).all()
+
+    data = [
+        {
+            "id": item.id,
+            "title": item.title,
+            "url": item.url
+        }
+
+        for item in history
+    ]
+
+    return JSONResponse(
+        content=data,
+        headers={
+            "Content-Disposition":
+            "attachment; filename=webharvest_report.json"
+        }
+    )
 
 
 @router.get("/export/pdf")
@@ -186,34 +196,34 @@ def export_history_pdf(
 
     pdf_path = "webharvest_report.pdf"
 
-    c = canvas.Canvas(
+    pdf = canvas.Canvas(
         pdf_path,
         pagesize=letter
     )
 
     y = 750
 
-    c.setFont(
+    pdf.setFont(
         "Helvetica-Bold",
         18
     )
 
-    c.drawString(
+    pdf.drawString(
         50,
         y,
-        "WebHarvest Report"
+        "WebHarvest Pro - Relatório"
     )
 
     y -= 40
 
-    c.setFont(
+    pdf.setFont(
         "Helvetica",
-        12
+        11
     )
 
     for item in history:
 
-        c.drawString(
+        pdf.drawString(
             50,
             y,
             f"ID: {item.id}"
@@ -221,7 +231,7 @@ def export_history_pdf(
 
         y -= 20
 
-        c.drawString(
+        pdf.drawString(
             50,
             y,
             f"Título: {item.title}"
@@ -229,19 +239,26 @@ def export_history_pdf(
 
         y -= 20
 
-        c.drawString(
+        pdf.drawString(
             50,
             y,
             f"URL: {item.url}"
         )
 
-        y -= 40
+        y -= 35
 
-        if y < 100:
-            c.showPage()
+        if y < 80:
+
+            pdf.showPage()
+
             y = 750
 
-    c.save()
+            pdf.setFont(
+                "Helvetica",
+                11
+            )
+
+    pdf.save()
 
     return FileResponse(
         path=pdf_path,
@@ -267,13 +284,11 @@ def export_history_excel(
 
     sheet.title = "WebHarvest"
 
-    headers = [
+    sheet.append([
         "ID",
         "Título",
         "URL"
-    ]
-
-    sheet.append(headers)
+    ])
 
     for item in history:
 

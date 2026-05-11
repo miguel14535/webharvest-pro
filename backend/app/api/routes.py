@@ -24,6 +24,7 @@ router.include_router(
     tags=["Scraper"]
 )
 
+
 @router.get("/health")
 def health():
     return {
