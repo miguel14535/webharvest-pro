@@ -1,707 +1,347 @@
 import { useEffect, useState } from "react";
 import api from "./services/api";
+import "./App.css";
 
 function App() {
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
+  const [url, setUrl] = useState("");
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-    const [logged, setLogged] = useState(
-        !!localStorage.getItem("token")
-    );
+  const user = {
+    email: "migueldhein50@gmail.com",
+  };
 
-    const [userEmail, setUserEmail] = useState("");
-    const [url, setUrl] = useState("");
-    const [resultado, setResultado] = useState(null);
-    const [history, setHistory] = useState([]);
-    const [loading, setLoading] = useState(false);
+  async function fetchHistory() {
+    try {
+      const response = await api.get("/scraper/history");
+      setHistory(response.data);
+    } catch (error) {
+      console.error("Erro ao carregar histórico");
+    }
+  }
 
-    useEffect(() => {
-        if (logged) {
-            loadHistory();
-            loadUser();
-        }
-    }, [logged]);
+  useEffect(() => {
+    fetchHistory();
+  }, []);
 
-    async function handleLogin() {
-        try {
-            const response = await api.post(
-                "/auth/login",
-                {},
-                {
-                    params: {
-                        email,
-                        password
-                    }
-                }
-            );
-
-            localStorage.setItem(
-                "token",
-                response.data.access_token
-            );
-
-            setLogged(true);
-            alert("Login realizado!");
-        } catch (error) {
-            console.log(error);
-            alert("Erro no login");
-        }
+  async function handleScrape() {
+    if (!url) {
+      alert("Digite uma URL");
+      return;
     }
 
-    async function loadUser() {
-        try {
-            const token = localStorage.getItem("token");
+    try {
+      setLoading(true);
 
-            const response = await api.get("/users/me", {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
+      await api.get(`/scraper/scrape?url=${encodeURIComponent(url)}`);
 
-            setUserEmail(
-                response.data.authenticated_user.email
-            );
-        } catch (error) {
-            console.log(error);
-        }
+      setUrl("");
+      fetchHistory();
+
+      alert("Extração realizada com sucesso!");
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao realizar scraping");
+    } finally {
+      setLoading(false);
     }
+  }
 
-    async function loadHistory() {
-        try {
-            const response = await api.get("/scraper/history");
-            setHistory(response.data);
-        } catch (error) {
-            console.log(error);
-        }
+  async function deleteItem(id) {
+    try {
+      await api.delete(`/scraper/history/${id}`);
+      fetchHistory();
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao excluir item");
     }
+  }
 
-    async function executarScraping() {
-        try {
-            if (!url.trim()) {
-                alert("Digite uma URL");
-                return;
-            }
+  return (
+    <div style={styles.container}>
+      <aside style={styles.sidebar}>
+        <h1 style={styles.logo}>WebHarvest</h1>
 
-            let finalUrl = url.trim();
+        <button style={styles.menuButton}>Painel</button>
+        <button style={styles.menuButton}>Extrações</button>
+        <button style={styles.menuButton}>Monitoramento</button>
+        <button style={styles.menuButton}>Histórico</button>
 
-            if (
-                !finalUrl.startsWith("http://") &&
-                !finalUrl.startsWith("https://")
-            ) {
-                finalUrl = `https://${finalUrl}`;
-            }
+        <button style={styles.logoutButton}>Sair</button>
+      </aside>
 
-            setLoading(true);
+      <main style={styles.main}>
+        <div style={styles.header}>
+          <h1>Painel de guerrilha</h1>
+          <p>Plataforma de automação, scraping e análise web.</p>
+        </div>
 
-            const response = await api.get("/scraper/scrape", {
-                params: {
-                    url: finalUrl
-                }
-            });
+        <div style={styles.cardsContainer}>
+          <div style={styles.card}>
+            <h2>Raspagens</h2>
+            <strong>{history.length}</strong>
+            <p>Registros salvos</p>
+          </div>
 
-            setResultado(response.data);
-            setUrl("");
+          <div style={styles.card}>
+            <h2>API de status</h2>
+            <strong>On-line</strong>
+            <p>FastAPI operacional</p>
+          </div>
 
-            await loadHistory();
-        } catch (error) {
-            console.log(error);
-            alert("Erro no scraping");
-        } finally {
-            setLoading(false);
-        }
-    }
+          <div style={styles.card}>
+            <h2>Usuário</h2>
 
-    async function deleteHistoryItem(id) {
-        try {
-            await api.delete(`/scraper/history/${id}`);
-            await loadHistory();
+            <p
+              style={{
+                wordBreak: "break-word",
+                overflowWrap: "break-word",
+              }}
+            >
+              {user.email}
+            </p>
 
-            alert("Item removido!");
-        } catch (error) {
-            console.log(error);
-            alert("Erro ao excluir");
-        }
-    }
+            <p>JWT ativo</p>
+          </div>
+        </div>
 
-    function logout() {
-        localStorage.removeItem("token");
-        setLogged(false);
-        setUserEmail("");
-        setResultado(null);
-        setUrl("");
-        setHistory([]);
-    }
+        <div style={styles.scraperBox}>
+          <h2>Extração de Executáveis Avançada</h2>
 
-    if (!logged) {
-        return (
-            <div style={styles.loginPage}>
-                <div style={styles.loginCard}>
-                    <h1 style={styles.logo}>
-                        WebHarvest Pro
-                    </h1>
+          <p>
+            Extraia título, descrição SEO, links, imagens e títulos.
+          </p>
 
-                    <input
-                        placeholder="Email"
-                        value={email}
-                        onChange={(e) =>
-                            setEmail(e.target.value)
-                        }
-                        style={styles.input}
-                    />
+          <div style={styles.scrapeActions}>
+            <input
+              type="text"
+              placeholder="Exemplo: https://github.com"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              style={styles.input}
+            />
 
-                    <input
-                        placeholder="Senha"
-                        type="password"
-                        value={password}
-                        onChange={(e) =>
-                            setPassword(e.target.value)
-                        }
-                        style={styles.input}
-                    />
+            <button
+              onClick={handleScrape}
+              disabled={loading}
+              style={{
+                ...styles.executeButton,
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
+              {loading ? "Extraindo..." : "Executar"}
+            </button>
+          </div>
+        </div>
 
-                    <button
-                        onClick={handleLogin}
-                        style={styles.loginButton}
-                    >
-                        Entrar
-                    </button>
+        <div style={styles.historyContainer}>
+          <div style={styles.historyHeader}>
+            <h2>Histórico</h2>
+
+            <button
+              onClick={fetchHistory}
+              style={styles.refreshButton}
+            >
+              Atualizar
+            </button>
+          </div>
+
+          {history.length === 0 ? (
+            <p style={{ color: "#94a3b8" }}>
+              Nenhuma raspagem realizada.
+            </p>
+          ) : (
+            history.map((item) => (
+              <div key={item.id} style={styles.historyCard}>
+                <div>
+                  <h3>{item.title}</h3>
+
+                  <p style={styles.historyUrl}>{item.url}</p>
+
+                  <span style={styles.historyBadge}>
+                    ID #{item.id}
+                  </span>
                 </div>
-            </div>
-        );
-    }
-
-    return (
-        <div style={styles.dashboard}>
-            <aside style={styles.sidebar}>
-                <h2 style={styles.sidebarLogo}>
-                    WebHarvest
-                </h2>
-
-                <button style={styles.menuButton}>
-                    Dashboard
-                </button>
-
-                <button style={styles.menuButton}>
-                    Extrações
-                </button>
-
-                <button style={styles.menuButton}>
-                    Monitoramento
-                </button>
-
-                <button style={styles.menuButton}>
-                    Histórico
-                </button>
 
                 <button
-                    onClick={logout}
-                    style={styles.logoutButton}
+                  onClick={() => deleteItem(item.id)}
+                  style={styles.deleteButton}
                 >
-                    Sair
+                  Excluir
                 </button>
-            </aside>
-
-            <main style={styles.main}>
-                <h1 style={styles.title}>
-                    Painel de Controle
-                </h1>
-
-                <p style={styles.subtitle}>
-                    Plataforma de automação, scraping e análise web.
-                </p>
-
-                <div style={styles.cards}>
-                    <div style={styles.card}>
-                        <h3>Scrapings</h3>
-                        <strong>{history.length}</strong>
-                        <p>Registros salvos</p>
-                    </div>
-
-                    <div style={styles.card}>
-                        <h3>Status API</h3>
-                        <strong>Online</strong>
-                        <p>FastAPI operacional</p>
-                    </div>
-
-                    <div style={styles.card}>
-                        <h3>Usuário</h3>
-                        <strong style={styles.userText}>
-                            {userEmail || "Carregando..."}
-                        </strong>
-                        <p>JWT ativo</p>
-                    </div>
-                </div>
-
-                <section style={styles.panel}>
-                    <h2>Executar Scraping Avançado</h2>
-
-                    <p style={styles.subtitle}>
-                        Extraia título, descrição SEO, links, imagens e headings.
-                    </p>
-
-                    <div style={styles.scraperForm}>
-                        <input
-                            type="text"
-                            placeholder="Ex: https://github.com"
-                            value={url}
-                            onChange={(e) =>
-                                setUrl(e.target.value)
-                            }
-                            style={styles.input}
-                        />
-
-                        <button
-                            onClick={executarScraping}
-                            style={styles.scrapeButton}
-                        >
-                            {loading
-                                ? "Executando..."
-                                : "Executar"}
-                        </button>
-                    </div>
-
-                    {resultado && (
-                        <div style={styles.resultBox}>
-                            <h2>Resultado da Extração</h2>
-
-                            <p>
-                                <strong>URL:</strong>{" "}
-                                {resultado.url}
-                            </p>
-
-                            <p>
-                                <strong>Título:</strong>{" "}
-                                {resultado.title}
-                            </p>
-
-                            <p>
-                                <strong>Descrição:</strong>{" "}
-                                {resultado.description}
-                            </p>
-
-                            <div style={styles.resultStats}>
-                                <div style={styles.statMiniCard}>
-                                    <strong>
-                                        {resultado.links_count}
-                                    </strong>
-                                    <span>Links encontrados</span>
-                                </div>
-
-                                <div style={styles.statMiniCard}>
-                                    <strong>
-                                        {resultado.images_count}
-                                    </strong>
-                                    <span>Imagens encontradas</span>
-                                </div>
-                            </div>
-
-                            <div style={styles.resultSection}>
-                                <h3>Headings H1</h3>
-
-                                {resultado.headings?.h1?.length > 0 ? (
-                                    resultado.headings.h1.map(
-                                        (item, index) => (
-                                            <p key={index}>
-                                                • {item}
-                                            </p>
-                                        )
-                                    )
-                                ) : (
-                                    <p style={styles.emptyText}>
-                                        Nenhum H1 encontrado.
-                                    </p>
-                                )}
-                            </div>
-
-                            <div style={styles.resultSection}>
-                                <h3>Headings H2</h3>
-
-                                {resultado.headings?.h2?.length > 0 ? (
-                                    resultado.headings.h2.map(
-                                        (item, index) => (
-                                            <p key={index}>
-                                                • {item}
-                                            </p>
-                                        )
-                                    )
-                                ) : (
-                                    <p style={styles.emptyText}>
-                                        Nenhum H2 encontrado.
-                                    </p>
-                                )}
-                            </div>
-
-                            <div style={styles.resultSection}>
-                                <h3>Links encontrados</h3>
-
-                                <div style={styles.scrollBox}>
-                                    {resultado.links?.length > 0 ? (
-                                        resultado.links.map(
-                                            (link, index) => (
-                                                <p key={index}>
-                                                    <a
-                                                        href={link}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        style={styles.link}
-                                                    >
-                                                        {link}
-                                                    </a>
-                                                </p>
-                                            )
-                                        )
-                                    ) : (
-                                        <p style={styles.emptyText}>
-                                            Nenhum link encontrado.
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div style={styles.resultSection}>
-                                <h3>Preview de imagens</h3>
-
-                                <div style={styles.imageGrid}>
-                                    {resultado.images?.length > 0 ? (
-                                        resultado.images
-                                            .slice(0, 8)
-                                            .map((img, index) => (
-                                                <img
-                                                    key={index}
-                                                    src={img}
-                                                    alt=""
-                                                    style={styles.previewImage}
-                                                />
-                                            ))
-                                    ) : (
-                                        <p style={styles.emptyText}>
-                                            Nenhuma imagem encontrada.
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </section>
-
-                <section style={styles.panel}>
-                    <div style={styles.historyHeader}>
-                        <h2>Histórico</h2>
-
-                        <button
-                            onClick={loadHistory}
-                            style={styles.refreshButton}
-                        >
-                            Atualizar
-                        </button>
-                    </div>
-
-                    {history.length === 0 ? (
-                        <p style={styles.subtitle}>
-                            Nenhum scraping realizado.
-                        </p>
-                    ) : (
-                        history.map((item) => (
-                            <div
-                                key={item.id}
-                                style={styles.historyItem}
-                            >
-                                <div>
-                                    <h3>
-                                        {item.title}
-                                    </h3>
-
-                                    <p style={styles.historyUrl}>
-                                        {item.url}
-                                    </p>
-
-                                    <span style={styles.historyBadge}>
-                                        ID #{item.id}
-                                    </span>
-                                </div>
-
-                                <button
-                                    onClick={() =>
-                                        deleteHistoryItem(item.id)
-                                    }
-                                    style={styles.deleteButton}
-                                >
-                                    Excluir
-                                </button>
-                            </div>
-                        ))
-                    )}
-                </section>
-            </main>
+              </div>
+            ))
+          )}
         </div>
-    );
+      </main>
+    </div>
+  );
 }
 
 const styles = {
-    loginPage: {
-        minHeight: "100vh",
-        background: "#020617",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        fontFamily: "Arial"
-    },
+  container: {
+    display: "flex",
+    minHeight: "100vh",
+    background: "#020617",
+    color: "white",
+    fontFamily: "Arial",
+  },
 
-    loginCard: {
-        background: "#0f172a",
-        padding: "40px",
-        borderRadius: "20px",
-        width: "400px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "20px",
-        border: "1px solid #1e293b"
-    },
+  sidebar: {
+    width: "260px",
+    background: "#081028",
+    padding: "30px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "15px",
+  },
 
-    logo: {
-        color: "white",
-        fontSize: "42px"
-    },
+  logo: {
+    marginBottom: "20px",
+  },
 
-    input: {
-        padding: "15px",
-        borderRadius: "10px",
-        border: "1px solid #1e293b",
-        background: "#111827",
-        color: "white",
-        outline: "none",
-        width: "100%"
-    },
+  menuButton: {
+    background: "#0f172a",
+    border: "1px solid #1e293b",
+    color: "white",
+    padding: "16px",
+    borderRadius: "12px",
+    cursor: "pointer",
+    textAlign: "left",
+    fontWeight: "bold",
+  },
 
-    loginButton: {
-        padding: "15px",
-        border: "none",
-        borderRadius: "10px",
-        background: "#2563eb",
-        color: "white",
-        fontWeight: "bold",
-        cursor: "pointer"
-    },
+  logoutButton: {
+    marginTop: "auto",
+    background: "#dc2626",
+    border: "none",
+    padding: "16px",
+    borderRadius: "12px",
+    color: "white",
+    cursor: "pointer",
+    fontWeight: "bold",
+  },
 
-    dashboard: {
-        display: "flex",
-        minHeight: "100vh",
-        background: "#020617",
-        color: "white",
-        fontFamily: "Arial"
-    },
+  main: {
+    flex: 1,
+    padding: "40px",
+  },
 
-    sidebar: {
-        width: "250px",
-        background: "#0f172a",
-        padding: "30px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "15px",
-        borderRight: "1px solid #1e293b"
-    },
+  header: {
+    textAlign: "center",
+    marginBottom: "40px",
+  },
 
-    sidebarLogo: {
-        marginBottom: "30px"
-    },
+  cardsContainer: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+    gap: "20px",
+    marginBottom: "40px",
+  },
 
-    menuButton: {
-        padding: "14px",
-        borderRadius: "10px",
-        border: "1px solid #1e293b",
-        background: "#111827",
-        color: "white",
-        cursor: "pointer",
-        textAlign: "left",
-        fontWeight: "bold"
-    },
+  card: {
+    background: "#0b1736",
+    padding: "30px",
+    borderRadius: "20px",
+    border: "1px solid #1e293b",
+    textAlign: "center",
+  },
 
-    logoutButton: {
-        marginTop: "auto",
-        padding: "14px",
-        border: "none",
-        borderRadius: "10px",
-        background: "#dc2626",
-        color: "white",
-        cursor: "pointer",
-        fontWeight: "bold"
-    },
+  scraperBox: {
+    background: "#0b1736",
+    padding: "40px",
+    borderRadius: "20px",
+    border: "1px solid #1e293b",
+    marginBottom: "40px",
+    textAlign: "center",
+  },
 
-    main: {
-        flex: 1,
-        padding: "40px",
-        maxWidth: "1150px"
-    },
+  scrapeActions: {
+    display: "flex",
+    gap: "15px",
+    marginTop: "25px",
+  },
 
-    title: {
-        fontSize: "42px",
-        marginBottom: "10px"
-    },
+  input: {
+    flex: 1,
+    padding: "18px",
+    borderRadius: "12px",
+    border: "1px solid #1e293b",
+    background: "#071126",
+    color: "white",
+    outline: "none",
+  },
 
-    subtitle: {
-        color: "#94a3b8",
-        marginBottom: "24px"
-    },
+  executeButton: {
+    background: "#7c3aed",
+    border: "none",
+    padding: "18px 28px",
+    borderRadius: "12px",
+    color: "white",
+    cursor: "pointer",
+    fontWeight: "bold",
+  },
 
-    cards: {
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
-        gap: "20px",
-        marginTop: "30px",
-        marginBottom: "30px"
-    },
+  historyContainer: {
+    background: "#0b1736",
+    padding: "30px",
+    borderRadius: "20px",
+    border: "1px solid #1e293b",
+  },
 
-    card: {
-        background: "#0f172a",
-        padding: "25px",
-        borderRadius: "16px",
-        border: "1px solid #1e293b",
-        textAlign: "center"
-    },
+  historyHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "20px",
+  },
 
-    userText: {
-        fontSize: "15px",
-        wordBreak: "break-word"
-    },
+  refreshButton: {
+    background: "#2563eb",
+    border: "none",
+    padding: "12px 18px",
+    borderRadius: "10px",
+    color: "white",
+    cursor: "pointer",
+    fontWeight: "bold",
+  },
 
-    panel: {
-        background: "#0f172a",
-        padding: "30px",
-        borderRadius: "16px",
-        marginBottom: "30px",
-        border: "1px solid #1e293b"
-    },
+  historyCard: {
+    background: "#020617",
+    border: "1px solid #1e293b",
+    padding: "25px",
+    borderRadius: "16px",
+    marginBottom: "20px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "20px",
+  },
 
-    scraperForm: {
-        display: "flex",
-        gap: "15px",
-        marginTop: "20px"
-    },
+  historyUrl: {
+    color: "#60a5fa",
+    marginTop: "10px",
+  },
 
-    scrapeButton: {
-        padding: "15px 24px",
-        border: "none",
-        borderRadius: "10px",
-        background: "#7c3aed",
-        color: "white",
-        cursor: "pointer",
-        fontWeight: "bold",
-        whiteSpace: "nowrap"
-    },
+  historyBadge: {
+    display: "inline-block",
+    marginTop: "10px",
+    background: "#1e293b",
+    padding: "6px 12px",
+    borderRadius: "999px",
+    color: "#cbd5e1",
+    fontSize: "12px",
+  },
 
-    resultBox: {
-        marginTop: "25px",
-        background: "#020617",
-        padding: "24px",
-        borderRadius: "14px",
-        border: "1px solid #334155"
-    },
-
-    resultStats: {
-        display: "flex",
-        gap: "16px",
-        marginTop: "20px",
-        marginBottom: "20px"
-    },
-
-    statMiniCard: {
-        background: "#0f172a",
-        padding: "18px",
-        borderRadius: "12px",
-        border: "1px solid #1e293b",
-        display: "flex",
-        flexDirection: "column",
-        gap: "6px"
-    },
-
-    resultSection: {
-        marginTop: "25px"
-    },
-
-    scrollBox: {
-        maxHeight: "220px",
-        overflowY: "auto",
-        background: "#0f172a",
-        padding: "15px",
-        borderRadius: "12px",
-        border: "1px solid #1e293b"
-    },
-
-    link: {
-        color: "#60a5fa",
-        wordBreak: "break-all"
-    },
-
-    imageGrid: {
-        display: "flex",
-        gap: "12px",
-        flexWrap: "wrap"
-    },
-
-    previewImage: {
-        width: "120px",
-        height: "120px",
-        objectFit: "cover",
-        borderRadius: "12px",
-        border: "1px solid #334155",
-        background: "#111827"
-    },
-
-    emptyText: {
-        color: "#94a3b8"
-    },
-
-    historyHeader: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center"
-    },
-
-    refreshButton: {
-        padding: "10px 16px",
-        borderRadius: "10px",
-        border: "none",
-        background: "#2563eb",
-        color: "white",
-        cursor: "pointer",
-        fontWeight: "bold"
-    },
-
-    historyItem: {
-        background: "#020617",
-        padding: "20px",
-        borderRadius: "12px",
-        marginTop: "15px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        border: "1px solid #334155",
-        gap: "20px"
-    },
-
-    historyUrl: {
-        color: "#94a3b8",
-        wordBreak: "break-all"
-    },
-
-    historyBadge: {
-        display: "inline-block",
-        padding: "6px 10px",
-        borderRadius: "999px",
-        background: "#1e293b",
-        color: "#cbd5e1",
-        fontSize: "12px"
-    },
-
-    deleteButton: {
-        background: "#dc2626",
-        border: "none",
-        padding: "10px 15px",
-        borderRadius: "10px",
-        color: "white",
-        cursor: "pointer",
-        fontWeight: "bold"
-    }
+  deleteButton: {
+    background: "#dc2626",
+    border: "none",
+    padding: "12px 18px",
+    borderRadius: "10px",
+    color: "white",
+    cursor: "pointer",
+    fontWeight: "bold",
+  },
 };
 
 export default App;
