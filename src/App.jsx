@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import api from "./services/api";
 import "./App.css";
 
@@ -16,7 +17,7 @@ function App() {
       const response = await api.get("/scraper/history");
       setHistory(response.data);
     } catch (error) {
-      console.error("Erro ao carregar histórico");
+      console.error("Erro ao carregar histórico", error);
     }
   }
 
@@ -25,18 +26,24 @@ function App() {
   }, []);
 
   async function handleScrape() {
-    if (!url) {
+    if (!url.trim()) {
       alert("Digite uma URL");
       return;
+    }
+
+    let finalUrl = url.trim();
+
+    if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
+      finalUrl = `https://${finalUrl}`;
     }
 
     try {
       setLoading(true);
 
-      await api.get(`/scraper/scrape?url=${encodeURIComponent(url)}`);
+      await api.get(`/scraper/scrape?url=${encodeURIComponent(finalUrl)}`);
 
       setUrl("");
-      fetchHistory();
+      await fetchHistory();
 
       alert("Extração realizada com sucesso!");
     } catch (error) {
@@ -50,16 +57,31 @@ function App() {
   async function deleteItem(id) {
     try {
       await api.delete(`/scraper/history/${id}`);
-      fetchHistory();
+      await fetchHistory();
     } catch (error) {
       console.error(error);
       alert("Erro ao excluir item");
     }
   }
 
+  const cardAnimation = {
+    initial: { opacity: 0, y: 35 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.45 },
+    whileHover: {
+      scale: 1.03,
+      boxShadow: "0px 0px 28px rgba(124,58,237,0.45)",
+    },
+  };
+
   return (
     <div style={styles.container}>
-      <aside style={styles.sidebar}>
+      <motion.aside
+        style={styles.sidebar}
+        initial={{ opacity: 0, x: -60 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.5 }}
+      >
         <h1 style={styles.logo}>WebHarvest</h1>
 
         <button style={styles.menuButton}>Painel</button>
@@ -68,49 +90,45 @@ function App() {
         <button style={styles.menuButton}>Histórico</button>
 
         <button style={styles.logoutButton}>Sair</button>
-      </aside>
+      </motion.aside>
 
       <main style={styles.main}>
-        <div style={styles.header}>
+        <motion.div
+          style={styles.header}
+          initial={{ opacity: 0, y: -25 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55 }}
+        >
           <h1>Painel de guerrilha</h1>
           <p>Plataforma de automação, scraping e análise web.</p>
-        </div>
+        </motion.div>
 
         <div style={styles.cardsContainer}>
-          <div style={styles.card}>
+          <motion.div style={styles.card} {...cardAnimation}>
             <h2>Raspagens</h2>
             <strong>{history.length}</strong>
             <p>Registros salvos</p>
-          </div>
+          </motion.div>
 
-          <div style={styles.card}>
+          <motion.div style={styles.card} {...cardAnimation}>
             <h2>API de status</h2>
             <strong>On-line</strong>
             <p>FastAPI operacional</p>
-          </div>
+          </motion.div>
 
-          <div style={styles.card}>
+          <motion.div style={styles.card} {...cardAnimation}>
             <h2>Usuário</h2>
 
-            <p
-              style={{
-                wordBreak: "break-word",
-                overflowWrap: "break-word",
-              }}
-            >
-              {user.email}
-            </p>
+            <p style={styles.emailText}>{user.email}</p>
 
             <p>JWT ativo</p>
-          </div>
+          </motion.div>
         </div>
 
-        <div style={styles.scraperBox}>
+        <motion.div style={styles.scraperBox} {...cardAnimation}>
           <h2>Extração de Executáveis Avançada</h2>
 
-          <p>
-            Extraia título, descrição SEO, links, imagens e títulos.
-          </p>
+          <p>Extraia título, descrição SEO, links, imagens e títulos.</p>
 
           <div style={styles.scrapeActions}>
             <input
@@ -127,40 +145,44 @@ function App() {
               style={{
                 ...styles.executeButton,
                 opacity: loading ? 0.7 : 1,
+                cursor: loading ? "not-allowed" : "pointer",
               }}
             >
               {loading ? "Extraindo..." : "Executar"}
             </button>
           </div>
-        </div>
+        </motion.div>
 
-        <div style={styles.historyContainer}>
+        <motion.div style={styles.historyContainer} {...cardAnimation}>
           <div style={styles.historyHeader}>
             <h2>Histórico</h2>
 
-            <button
-              onClick={fetchHistory}
-              style={styles.refreshButton}
-            >
+            <button onClick={fetchHistory} style={styles.refreshButton}>
               Atualizar
             </button>
           </div>
 
           {history.length === 0 ? (
-            <p style={{ color: "#94a3b8" }}>
-              Nenhuma raspagem realizada.
-            </p>
+            <p style={{ color: "#94a3b8" }}>Nenhuma raspagem realizada.</p>
           ) : (
-            history.map((item) => (
-              <div key={item.id} style={styles.historyCard}>
+            history.map((item, index) => (
+              <motion.div
+                key={item.id}
+                style={styles.historyCard}
+                initial={{ opacity: 0, y: 25 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, delay: index * 0.05 }}
+                whileHover={{
+                  scale: 1.01,
+                  borderColor: "#7c3aed",
+                }}
+              >
                 <div>
                   <h3>{item.title}</h3>
 
                   <p style={styles.historyUrl}>{item.url}</p>
 
-                  <span style={styles.historyBadge}>
-                    ID #{item.id}
-                  </span>
+                  <span style={styles.historyBadge}>ID #{item.id}</span>
                 </div>
 
                 <button
@@ -169,10 +191,10 @@ function App() {
                 >
                   Excluir
                 </button>
-              </div>
+              </motion.div>
             ))
           )}
-        </div>
+        </motion.div>
       </main>
     </div>
   );
@@ -181,19 +203,24 @@ function App() {
 const styles = {
   container: {
     display: "flex",
+    flexWrap: "wrap",
     minHeight: "100vh",
-    background: "#020617",
+    background:
+      "radial-gradient(circle at top, #111827 0%, #020617 45%, #000 100%)",
     color: "white",
     fontFamily: "Arial",
   },
 
   sidebar: {
     width: "260px",
-    background: "#081028",
+    minWidth: "220px",
+    background: "rgba(8,16,40,0.95)",
     padding: "30px",
     display: "flex",
     flexDirection: "column",
     gap: "15px",
+    borderRight: "1px solid #1e293b",
+    boxShadow: "10px 0 30px rgba(0,0,0,0.25)",
   },
 
   logo: {
@@ -213,7 +240,7 @@ const styles = {
 
   logoutButton: {
     marginTop: "auto",
-    background: "#dc2626",
+    background: "linear-gradient(135deg,#dc2626,#991b1b)",
     border: "none",
     padding: "16px",
     borderRadius: "12px",
@@ -225,6 +252,7 @@ const styles = {
   main: {
     flex: 1,
     padding: "40px",
+    minWidth: "320px",
   },
 
   header: {
@@ -240,20 +268,29 @@ const styles = {
   },
 
   card: {
-    background: "#0b1736",
+    background: "rgba(15,23,42,0.92)",
     padding: "30px",
     borderRadius: "20px",
     border: "1px solid #1e293b",
     textAlign: "center",
+    boxShadow: "0 0 25px rgba(0,0,0,0.25)",
+  },
+
+  emailText: {
+    wordBreak: "break-word",
+    overflowWrap: "break-word",
+    color: "#e2e8f0",
+    fontWeight: "bold",
   },
 
   scraperBox: {
-    background: "#0b1736",
+    background: "rgba(15,23,42,0.92)",
     padding: "40px",
     borderRadius: "20px",
     border: "1px solid #1e293b",
     marginBottom: "40px",
     textAlign: "center",
+    boxShadow: "0 0 25px rgba(0,0,0,0.25)",
   },
 
   scrapeActions: {
@@ -273,7 +310,7 @@ const styles = {
   },
 
   executeButton: {
-    background: "#7c3aed",
+    background: "linear-gradient(135deg,#7c3aed,#2563eb)",
     border: "none",
     padding: "18px 28px",
     borderRadius: "12px",
@@ -283,10 +320,11 @@ const styles = {
   },
 
   historyContainer: {
-    background: "#0b1736",
+    background: "rgba(15,23,42,0.92)",
     padding: "30px",
     borderRadius: "20px",
     border: "1px solid #1e293b",
+    boxShadow: "0 0 25px rgba(0,0,0,0.25)",
   },
 
   historyHeader: {
@@ -297,7 +335,7 @@ const styles = {
   },
 
   refreshButton: {
-    background: "#2563eb",
+    background: "linear-gradient(135deg,#2563eb,#1d4ed8)",
     border: "none",
     padding: "12px 18px",
     borderRadius: "10px",
@@ -321,6 +359,7 @@ const styles = {
   historyUrl: {
     color: "#60a5fa",
     marginTop: "10px",
+    wordBreak: "break-all",
   },
 
   historyBadge: {
@@ -334,7 +373,7 @@ const styles = {
   },
 
   deleteButton: {
-    background: "#dc2626",
+    background: "linear-gradient(135deg,#dc2626,#991b1b)",
     border: "none",
     padding: "12px 18px",
     borderRadius: "10px",
