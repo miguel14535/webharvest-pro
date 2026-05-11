@@ -1,28 +1,32 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import APIRouter, Depends
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-
-from reportlab.platypus import (
-    SimpleDocTemplate,
-    Paragraph,
-    Spacer
-)
-
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.pagesizes import letter
-
-import requests
 
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
+from openpyxl import Workbook
+from tempfile import NamedTemporaryFile
+
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+
+import requests
+
 from app.services.database import get_db
 from app.models.scraping_history import ScrapingHistory
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/api/scraper",
+    tags=["Scraper"]
+)
+
 
 @router.get("/scrape")
-def scrape(url: str, db: Session = Depends(get_db)):
+def scrape(
+    url: str,
+    db: Session = Depends(get_db)
+):
 
     try:
 
@@ -36,10 +40,8 @@ def scrape(url: str, db: Session = Depends(get_db)):
         response = requests.get(
             url,
             headers=headers,
-            timeout=15
+            timeout=10
         )
-
-        response.raise_for_status()
 
         soup = BeautifulSoup(
             response.text,
@@ -48,83 +50,94 @@ def scrape(url: str, db: Session = Depends(get_db)):
 
         title = (
             soup.title.string.strip()
-            if soup.title and soup.title.string
+            if soup.title
             else "Sem título"
         )
+
+        description = ""
 
         description_tag = soup.find(
             "meta",
             attrs={"name": "description"}
         )
 
-        description = (
-            description_tag.get("content").strip()
-            if description_tag and description_tag.get("content")
-            else "Sem descrição"
-        )
+        if description_tag:
+            description = description_tag.get(
+                "content",
+                ""
+            )
 
         links = []
 
-        for link in soup.find_all("a", href=True)[:20]:
-            links.append(
-                urljoin(url, link["href"])
+        for a in soup.find_all("a", href=True):
+
+            href = urljoin(
+                url,
+                a["href"]
             )
+
+            links.append(href)
 
         images = []
 
-        for image in soup.find_all("img", src=True)[:20]:
-            images.append(
-                urljoin(url, image["src"])
+        for img in soup.find_all("img", src=True):
+
+            src = urljoin(
+                url,
+                img["src"]
             )
+
+            images.append(src)
 
         headings = {
             "h1": [
                 h.get_text(strip=True)
-                for h in soup.find_all("h1")[:10]
+                for h in soup.find_all("h1")
             ],
 
             "h2": [
                 h.get_text(strip=True)
-                for h in soup.find_all("h2")[:10]
+                for h in soup.find_all("h2")
             ],
 
             "h3": [
                 h.get_text(strip=True)
-                for h in soup.find_all("h3")[:10]
-            ]
+                for h in soup.find_all("h3")
+            ],
         }
 
-        item = ScrapingHistory(
+        history_item = ScrapingHistory(
             url=url,
             title=title
         )
 
-        db.add(item)
+        db.add(history_item)
         db.commit()
-        db.refresh(item)
+        db.refresh(history_item)
 
         return {
-            "id": item.id,
+            "id": history_item.id,
             "url": url,
             "title": title,
             "description": description,
             "links_count": len(links),
             "images_count": len(images),
             "headings": headings,
-            "links": links,
-            "images": images
+            "links": links[:20],
+            "images": images[:20]
         }
 
-    except requests.exceptions.RequestException as error:
+    except Exception as e:
 
-        raise HTTPException(
-            status_code=400,
-            detail=f"Erro ao acessar o site: {str(error)}"
-        )
+        return {
+            "error": str(e)
+        }
 
 
 @router.get("/history")
-def get_history(db: Session = Depends(get_db)):
+def get_history(
+    db: Session = Depends(get_db)
+):
 
     history = db.query(
         ScrapingHistory
@@ -148,47 +161,16 @@ def delete_history_item(
     ).first()
 
     if not item:
-
-        raise HTTPException(
-            status_code=404,
-            detail="Item not found"
-        )
+        return {
+            "error": "Item não encontrado"
+        }
 
     db.delete(item)
     db.commit()
 
     return {
-        "message": "Item deleted successfully"
+        "message": "Item deletado com sucesso"
     }
-
-
-@router.get("/export/json")
-def export_history_json(
-    db: Session = Depends(get_db)
-):
-
-    history = db.query(
-        ScrapingHistory
-    ).order_by(
-        ScrapingHistory.id.desc()
-    ).all()
-
-    data = [
-        {
-            "id": item.id,
-            "url": item.url,
-            "title": item.title
-        }
-        for item in history
-    ]
-
-    return JSONResponse(
-        content=data,
-        headers={
-            "Content-Disposition":
-            "attachment; filename=webharvest-history.json"
-        }
-    )
 
 
 @router.get("/export/pdf")
@@ -204,49 +186,114 @@ def export_history_pdf(
 
     pdf_path = "webharvest_report.pdf"
 
-    doc = SimpleDocTemplate(
+    c = canvas.Canvas(
         pdf_path,
         pagesize=letter
     )
 
-    styles = getSampleStyleSheet()
+    y = 750
 
-    elements = []
-
-    title = Paragraph(
-        "<b>WebHarvest Pro - Relatório de Scraping</b>",
-        styles["Title"]
+    c.setFont(
+        "Helvetica-Bold",
+        18
     )
 
-    elements.append(title)
+    c.drawString(
+        50,
+        y,
+        "WebHarvest Report"
+    )
 
-    elements.append(
-        Spacer(1, 20)
+    y -= 40
+
+    c.setFont(
+        "Helvetica",
+        12
     )
 
     for item in history:
 
-        text = f"""
-        <b>ID:</b> {item.id}<br/>
-        <b>Título:</b> {item.title}<br/>
-        <b>URL:</b> {item.url}<br/><br/>
-        """
-
-        paragraph = Paragraph(
-            text,
-            styles["BodyText"]
+        c.drawString(
+            50,
+            y,
+            f"ID: {item.id}"
         )
 
-        elements.append(paragraph)
+        y -= 20
 
-        elements.append(
-            Spacer(1, 12)
+        c.drawString(
+            50,
+            y,
+            f"Título: {item.title}"
         )
 
-    doc.build(elements)
+        y -= 20
+
+        c.drawString(
+            50,
+            y,
+            f"URL: {item.url}"
+        )
+
+        y -= 40
+
+        if y < 100:
+            c.showPage()
+            y = 750
+
+    c.save()
 
     return FileResponse(
         path=pdf_path,
         filename="webharvest_report.pdf",
         media_type="application/pdf"
+    )
+
+
+@router.get("/export/excel")
+def export_history_excel(
+    db: Session = Depends(get_db)
+):
+
+    history = db.query(
+        ScrapingHistory
+    ).order_by(
+        ScrapingHistory.id.desc()
+    ).all()
+
+    workbook = Workbook()
+
+    sheet = workbook.active
+
+    sheet.title = "WebHarvest"
+
+    headers = [
+        "ID",
+        "Título",
+        "URL"
+    ]
+
+    sheet.append(headers)
+
+    for item in history:
+
+        sheet.append([
+            item.id,
+            item.title,
+            item.url
+        ])
+
+    temp_file = NamedTemporaryFile(
+        delete=False,
+        suffix=".xlsx"
+    )
+
+    workbook.save(
+        temp_file.name
+    )
+
+    return FileResponse(
+        path=temp_file.name,
+        filename="webharvest_report.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
