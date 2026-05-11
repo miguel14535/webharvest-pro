@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  Tooltip,
+  CartesianGrid,
+} from "recharts";
+
 import api from "./services/api";
 import "./App.css";
 
@@ -33,16 +42,22 @@ function App() {
 
     let finalUrl = url.trim();
 
-    if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
+    if (
+      !finalUrl.startsWith("http://") &&
+      !finalUrl.startsWith("https://")
+    ) {
       finalUrl = `https://${finalUrl}`;
     }
 
     try {
       setLoading(true);
 
-      await api.get(`/scraper/scrape?url=${encodeURIComponent(finalUrl)}`);
+      await api.get(
+        `/scraper/scrape?url=${encodeURIComponent(finalUrl)}`
+      );
 
       setUrl("");
+
       await fetchHistory();
 
       alert("Extração realizada com sucesso!");
@@ -64,13 +79,22 @@ function App() {
     }
   }
 
+  const chartData = history
+    .slice(0, 7)
+    .reverse()
+    .map((item, index) => ({
+      name: `#${item.id}`,
+      raspagens: index + 1,
+    }));
+
   const cardAnimation = {
     initial: { opacity: 0, y: 35 },
     animate: { opacity: 1, y: 0 },
     transition: { duration: 0.45 },
     whileHover: {
       scale: 1.03,
-      boxShadow: "0px 0px 28px rgba(124,58,237,0.45)",
+      boxShadow:
+        "0px 0px 28px rgba(124,58,237,0.45)",
     },
   };
 
@@ -84,12 +108,25 @@ function App() {
       >
         <h1 style={styles.logo}>WebHarvest</h1>
 
-        <button style={styles.menuButton}>Painel</button>
-        <button style={styles.menuButton}>Extrações</button>
-        <button style={styles.menuButton}>Monitoramento</button>
-        <button style={styles.menuButton}>Histórico</button>
+        <button style={styles.menuButton}>
+          Painel
+        </button>
 
-        <button style={styles.logoutButton}>Sair</button>
+        <button style={styles.menuButton}>
+          Extrações
+        </button>
+
+        <button style={styles.menuButton}>
+          Monitoramento
+        </button>
+
+        <button style={styles.menuButton}>
+          Histórico
+        </button>
+
+        <button style={styles.logoutButton}>
+          Sair
+        </button>
       </motion.aside>
 
       <main style={styles.main}>
@@ -99,43 +136,109 @@ function App() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55 }}
         >
-          <h1>Painel de guerrilha</h1>
-          <p>Plataforma de automação, scraping e análise web.</p>
+          <h1>Painel Analytics</h1>
+
+          <p>
+            Plataforma premium de scraping e análise web.
+          </p>
         </motion.div>
 
         <div style={styles.cardsContainer}>
-          <motion.div style={styles.card} {...cardAnimation}>
+          <motion.div
+            style={styles.card}
+            {...cardAnimation}
+          >
             <h2>Raspagens</h2>
-            <strong>{history.length}</strong>
+
+            <strong style={styles.bigNumber}>
+              {history.length}
+            </strong>
+
             <p>Registros salvos</p>
           </motion.div>
 
-          <motion.div style={styles.card} {...cardAnimation}>
-            <h2>API de status</h2>
-            <strong>On-line</strong>
+          <motion.div
+            style={styles.card}
+            {...cardAnimation}
+          >
+            <h2>Status API</h2>
+
+            <strong style={styles.onlineText}>
+              Online
+            </strong>
+
             <p>FastAPI operacional</p>
           </motion.div>
 
-          <motion.div style={styles.card} {...cardAnimation}>
+          <motion.div
+            style={styles.card}
+            {...cardAnimation}
+          >
             <h2>Usuário</h2>
 
-            <p style={styles.emailText}>{user.email}</p>
+            <p style={styles.emailText}>
+              {user.email}
+            </p>
 
             <p>JWT ativo</p>
           </motion.div>
         </div>
 
-        <motion.div style={styles.scraperBox} {...cardAnimation}>
-          <h2>Extração de Executáveis Avançada</h2>
+        <motion.div
+          style={styles.chartContainer}
+          {...cardAnimation}
+        >
+          <div style={styles.chartHeader}>
+            <h2>Analytics</h2>
 
-          <p>Extraia título, descrição SEO, links, imagens e títulos.</p>
+            <span style={styles.analyticsBadge}>
+              Últimas raspagens
+            </span>
+          </div>
+
+          <div style={{ width: "100%", height: 320 }}>
+            <ResponsiveContainer>
+              <BarChart data={chartData}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#1e293b"
+                />
+
+                <XAxis
+                  dataKey="name"
+                  stroke="#94a3b8"
+                />
+
+                <Tooltip />
+
+                <Bar
+                  dataKey="raspagens"
+                  fill="#7c3aed"
+                  radius={[10, 10, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+
+        <motion.div
+          style={styles.scraperBox}
+          {...cardAnimation}
+        >
+          <h2>Extração Avançada</h2>
+
+          <p>
+            Extraia dados, títulos e links de qualquer site.
+          </p>
 
           <div style={styles.scrapeActions}>
             <input
               type="text"
-              placeholder="Exemplo: https://github.com"
+              placeholder="https://github.com"
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={(e) =>
+                setUrl(e.target.value)
+              }
               style={styles.input}
             />
 
@@ -145,33 +248,51 @@ function App() {
               style={{
                 ...styles.executeButton,
                 opacity: loading ? 0.7 : 1,
-                cursor: loading ? "not-allowed" : "pointer",
               }}
             >
-              {loading ? "Extraindo..." : "Executar"}
+              {loading
+                ? "Extraindo..."
+                : "Executar"}
             </button>
           </div>
         </motion.div>
 
-        <motion.div style={styles.historyContainer} {...cardAnimation}>
+        <motion.div
+          style={styles.historyContainer}
+          {...cardAnimation}
+        >
           <div style={styles.historyHeader}>
             <h2>Histórico</h2>
 
-            <button onClick={fetchHistory} style={styles.refreshButton}>
+            <button
+              onClick={fetchHistory}
+              style={styles.refreshButton}
+            >
               Atualizar
             </button>
           </div>
 
           {history.length === 0 ? (
-            <p style={{ color: "#94a3b8" }}>Nenhuma raspagem realizada.</p>
+            <p style={{ color: "#94a3b8" }}>
+              Nenhuma raspagem realizada.
+            </p>
           ) : (
             history.map((item, index) => (
               <motion.div
                 key={item.id}
                 style={styles.historyCard}
-                initial={{ opacity: 0, y: 25 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.35, delay: index * 0.05 }}
+                initial={{
+                  opacity: 0,
+                  y: 25,
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                }}
+                transition={{
+                  duration: 0.35,
+                  delay: index * 0.05,
+                }}
                 whileHover={{
                   scale: 1.01,
                   borderColor: "#7c3aed",
@@ -180,13 +301,19 @@ function App() {
                 <div>
                   <h3>{item.title}</h3>
 
-                  <p style={styles.historyUrl}>{item.url}</p>
+                  <p style={styles.historyUrl}>
+                    {item.url}
+                  </p>
 
-                  <span style={styles.historyBadge}>ID #{item.id}</span>
+                  <span style={styles.historyBadge}>
+                    ID #{item.id}
+                  </span>
                 </div>
 
                 <button
-                  onClick={() => deleteItem(item.id)}
+                  onClick={() =>
+                    deleteItem(item.id)
+                  }
                   style={styles.deleteButton}
                 >
                   Excluir
@@ -240,7 +367,8 @@ const styles = {
 
   logoutButton: {
     marginTop: "auto",
-    background: "linear-gradient(135deg,#dc2626,#991b1b)",
+    background:
+      "linear-gradient(135deg,#dc2626,#991b1b)",
     border: "none",
     padding: "16px",
     borderRadius: "12px",
@@ -262,7 +390,8 @@ const styles = {
 
   cardsContainer: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+    gridTemplateColumns:
+      "repeat(auto-fit, minmax(250px, 1fr))",
     gap: "20px",
     marginBottom: "40px",
   },
@@ -273,13 +402,49 @@ const styles = {
     borderRadius: "20px",
     border: "1px solid #1e293b",
     textAlign: "center",
-    boxShadow: "0 0 25px rgba(0,0,0,0.25)",
+    boxShadow:
+      "0 0 25px rgba(0,0,0,0.25)",
+  },
+
+  bigNumber: {
+    fontSize: "42px",
+    color: "#7c3aed",
+  },
+
+  onlineText: {
+    color: "#22c55e",
+    fontSize: "28px",
   },
 
   emailText: {
     wordBreak: "break-word",
     overflowWrap: "break-word",
     color: "#e2e8f0",
+    fontWeight: "bold",
+  },
+
+  chartContainer: {
+    background: "rgba(15,23,42,0.92)",
+    padding: "30px",
+    borderRadius: "20px",
+    border: "1px solid #1e293b",
+    marginBottom: "40px",
+    boxShadow:
+      "0 0 25px rgba(0,0,0,0.25)",
+  },
+
+  chartHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "20px",
+  },
+
+  analyticsBadge: {
+    background: "#7c3aed",
+    padding: "8px 14px",
+    borderRadius: "999px",
+    fontSize: "12px",
     fontWeight: "bold",
   },
 
@@ -290,7 +455,8 @@ const styles = {
     border: "1px solid #1e293b",
     marginBottom: "40px",
     textAlign: "center",
-    boxShadow: "0 0 25px rgba(0,0,0,0.25)",
+    boxShadow:
+      "0 0 25px rgba(0,0,0,0.25)",
   },
 
   scrapeActions: {
@@ -310,7 +476,8 @@ const styles = {
   },
 
   executeButton: {
-    background: "linear-gradient(135deg,#7c3aed,#2563eb)",
+    background:
+      "linear-gradient(135deg,#7c3aed,#2563eb)",
     border: "none",
     padding: "18px 28px",
     borderRadius: "12px",
@@ -324,7 +491,8 @@ const styles = {
     padding: "30px",
     borderRadius: "20px",
     border: "1px solid #1e293b",
-    boxShadow: "0 0 25px rgba(0,0,0,0.25)",
+    boxShadow:
+      "0 0 25px rgba(0,0,0,0.25)",
   },
 
   historyHeader: {
@@ -335,7 +503,8 @@ const styles = {
   },
 
   refreshButton: {
-    background: "linear-gradient(135deg,#2563eb,#1d4ed8)",
+    background:
+      "linear-gradient(135deg,#2563eb,#1d4ed8)",
     border: "none",
     padding: "12px 18px",
     borderRadius: "10px",
@@ -373,7 +542,8 @@ const styles = {
   },
 
   deleteButton: {
-    background: "linear-gradient(135deg,#dc2626,#991b1b)",
+    background:
+      "linear-gradient(135deg,#dc2626,#991b1b)",
     border: "none",
     padding: "12px 18px",
     borderRadius: "10px",
