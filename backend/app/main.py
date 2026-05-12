@@ -1,24 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
-from app.core.config import settings
-
-from app.database.connection import engine, Base
-
-from app.models.scraping_history import ScrapingHistory
-
-from app.models.scraping_job import ScrapingJob
-
-# cria tabelas automaticamente
-Base.metadata.create_all(bind=engine)
+from app.database.connection import Base, engine
 
 app = FastAPI(
-    title=settings.PROJECT_NAME,
-    version=settings.API_VERSION
+    title="WebHarvest Pro API"
 )
 
-# CORS
+Base.metadata.create_all(bind=engine)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,12 +19,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# rotas
-app.include_router(router, prefix="/api")
+app.mount(
+    "/static",
+    StaticFiles(directory="static"),
+    name="static"
+)
+
+app.include_router(router)
 
 
 @app.get("/")
 def home():
     return {
-        "message": "WebHarvest Pro API Running"
+        "message": "WebHarvest API Online"
+    }
+
+
+@app.get("/api/health")
+def health():
+    return {
+        "status": "online"
     }
