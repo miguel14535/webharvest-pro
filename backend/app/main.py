@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-
+from app.api.monitor import router as monitor_router
 from app.api.routes import router
 from app.database.connection import Base, engine
 
@@ -27,6 +27,7 @@ app.mount(
 
 app.include_router(router)
 
+app.include_router(monitor_router)
 
 @app.get("/")
 def home():
