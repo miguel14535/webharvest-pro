@@ -1,314 +1,207 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin
-from tempfile import NamedTemporaryFile
-
-from openpyxl import Workbook
-
-from reportlab.lib.pagesizes import letter
+from fastapi.responses import FileResponse
 from reportlab.pdfgen import canvas
+from openpyxl import Workbook
+import json
 
-from app.services.database import get_db
-from app.models.scraping_history import ScrapingHistory
+from app.database.connection import get_db
+from app.models.user import ScrapingHistory
+from app.services.scraper_service import scrape_website
 
-router = APIRouter()
+router = APIRouter(prefix="/api/scraper", tags=["Scraper"])
 
 
 @router.get("/scrape")
 def scrape(url: str, db: Session = Depends(get_db)):
+    data = scrape_website(url)
 
-    try:
+    new_item = ScrapingHistory(
+        url=url,
+        title=data.get("title", "Sem título"),
+        description=data.get("description", ""),
+    )
 
-        if not url.startswith("http://") and not url.startswith("https://"):
-            url = f"https://{url}"
+    db.add(new_item)
+    db.commit()
+    db.refresh(new_item)
 
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
-
-        response = requests.get(
-            url,
-            headers=headers,
-            timeout=10
-        )
-
-        soup = BeautifulSoup(
-            response.text,
-            "html.parser"
-        )
-
-        title = (
-            soup.title.string.strip()
-            if soup.title and soup.title.string
-            else "Sem título"
-        )
-
-        description_tag = soup.find(
-            "meta",
-            attrs={"name": "description"}
-        )
-
-        description = (
-            description_tag.get("content", "")
-            if description_tag
-            else ""
-        )
-
-        links = [
-            urljoin(url, a["href"])
-            for a in soup.find_all("a", href=True)
-        ]
-
-        images = [
-            urljoin(url, img["src"])
-            for img in soup.find_all("img", src=True)
-        ]
-
-        headings = {
-            "h1": [
-                h.get_text(strip=True)
-                for h in soup.find_all("h1")
-            ],
-
-            "h2": [
-                h.get_text(strip=True)
-                for h in soup.find_all("h2")
-            ],
-
-            "h3": [
-                h.get_text(strip=True)
-                for h in soup.find_all("h3")
-            ]
-        }
-
-        item = ScrapingHistory(
-            url=url,
-            title=title
-        )
-
-        db.add(item)
-        db.commit()
-        db.refresh(item)
-
-        return {
-            "id": item.id,
-            "url": url,
-            "title": title,
-            "description": description,
-            "links_count": len(links),
-            "images_count": len(images),
-            "headings": headings,
-            "links": links[:20],
-            "images": images[:20]
-        }
-
-    except Exception as error:
-
-        raise HTTPException(
-            status_code=400,
-            detail=str(error)
-        )
+    return {
+        "message": "Scraping realizado com sucesso",
+        "data": data,
+    }
 
 
 @router.get("/history")
-def get_history(
-    db: Session = Depends(get_db)
-):
+def get_history(db: Session = Depends(get_db)):
+    history = (
+        db.query(ScrapingHistory)
+        .order_by(ScrapingHistory.id.desc())
+        .all()
+    )
 
-    return db.query(
-        ScrapingHistory
-    ).order_by(
-        ScrapingHistory.id.desc()
-    ).all()
+    return history
 
 
 @router.delete("/history/{item_id}")
 def delete_history_item(
     item_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-
-    item = db.query(
-        ScrapingHistory
-    ).filter(
-        ScrapingHistory.id == item_id
-    ).first()
+    item = (
+        db.query(ScrapingHistory)
+        .filter(ScrapingHistory.id == item_id)
+        .first()
+    )
 
     if not item:
-
-        raise HTTPException(
-            status_code=404,
-            detail="Item não encontrado"
-        )
+        return {"message": "Item não encontrado"}
 
     db.delete(item)
     db.commit()
 
+    return {"message": "Item removido"}
+
+
+@router.delete("/history")
+def clear_history(db: Session = Depends(get_db)):
+    db.query(ScrapingHistory).delete()
+    db.commit()
+
     return {
-        "message": "Item deletado com sucesso"
+        "message": "Histórico limpo com sucesso"
     }
 
 
 @router.get("/export/json")
 def export_history_json(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
+    history = (
+        db.query(ScrapingHistory)
+        .order_by(ScrapingHistory.id.desc())
+        .all()
+    )
 
-    history = db.query(
-        ScrapingHistory
-    ).order_by(
-        ScrapingHistory.id.desc()
-    ).all()
+    data = []
 
-    data = [
-        {
+    for item in history:
+        data.append({
             "id": item.id,
             "title": item.title,
-            "url": item.url
-        }
+            "url": item.url,
+            "description": item.description,
+        })
 
-        for item in history
-    ]
+    json_path = "webharvest_export.json"
 
-    return JSONResponse(
-        content=data,
-        headers={
-            "Content-Disposition":
-            "attachment; filename=webharvest_report.json"
-        }
+    with open(
+        json_path,
+        "w",
+        encoding="utf-8",
+    ) as file:
+        json.dump(
+            data,
+            file,
+            indent=4,
+            ensure_ascii=False,
+        )
+
+    return FileResponse(
+        path=json_path,
+        filename="webharvest_export.json",
+        media_type="application/json",
     )
 
 
 @router.get("/export/pdf")
 def export_history_pdf(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-
-    history = db.query(
-        ScrapingHistory
-    ).order_by(
-        ScrapingHistory.id.desc()
-    ).all()
+    history = (
+        db.query(ScrapingHistory)
+        .order_by(ScrapingHistory.id.desc())
+        .all()
+    )
 
     pdf_path = "webharvest_report.pdf"
 
-    pdf = canvas.Canvas(
-        pdf_path,
-        pagesize=letter
-    )
+    pdf = canvas.Canvas(pdf_path)
 
-    y = 750
-
-    pdf.setFont(
-        "Helvetica-Bold",
-        18
-    )
-
+    pdf.setFont("Helvetica-Bold", 18)
     pdf.drawString(
-        50,
-        y,
-        "WebHarvest Pro - Relatório"
+        100,
+        800,
+        "WebHarvest Report"
     )
 
-    y -= 40
+    y = 760
 
-    pdf.setFont(
-        "Helvetica",
-        11
-    )
+    pdf.setFont("Helvetica", 12)
 
     for item in history:
-
-        pdf.drawString(
-            50,
-            y,
-            f"ID: {item.id}"
+        text = (
+            f"{item.id} - "
+            f"{item.title} - "
+            f"{item.url}"
         )
 
-        y -= 20
+        pdf.drawString(50, y, text)
 
-        pdf.drawString(
-            50,
-            y,
-            f"Título: {item.title}"
-        )
-
-        y -= 20
-
-        pdf.drawString(
-            50,
-            y,
-            f"URL: {item.url}"
-        )
-
-        y -= 35
+        y -= 25
 
         if y < 80:
-
             pdf.showPage()
-
-            y = 750
-
-            pdf.setFont(
-                "Helvetica",
-                11
-            )
+            y = 800
 
     pdf.save()
 
     return FileResponse(
         path=pdf_path,
         filename="webharvest_report.pdf",
-        media_type="application/pdf"
+        media_type="application/pdf",
     )
 
 
 @router.get("/export/excel")
 def export_history_excel(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-
-    history = db.query(
-        ScrapingHistory
-    ).order_by(
-        ScrapingHistory.id.desc()
-    ).all()
+    history = (
+        db.query(ScrapingHistory)
+        .order_by(ScrapingHistory.id.desc())
+        .all()
+    )
 
     workbook = Workbook()
 
     sheet = workbook.active
-
     sheet.title = "WebHarvest"
 
     sheet.append([
         "ID",
         "Título",
-        "URL"
+        "URL",
+        "Descrição",
     ])
 
     for item in history:
-
         sheet.append([
             item.id,
             item.title,
-            item.url
+            item.url,
+            item.description,
         ])
 
-    temp_file = NamedTemporaryFile(
-        delete=False,
-        suffix=".xlsx"
-    )
+    excel_path = "webharvest_report.xlsx"
 
-    workbook.save(
-        temp_file.name
-    )
+    workbook.save(excel_path)
 
     return FileResponse(
-        path=temp_file.name,
+        path=excel_path,
         filename="webharvest_report.xlsx",
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        media_type=(
+            "application/vnd.openxmlformats-"
+            "officedocument.spreadsheetml.sheet"
+        ),
     )
