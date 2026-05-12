@@ -104,22 +104,23 @@ function App() {
   }
 
   async function clearHistory() {
-    try {
-      await api.delete("/scraper/history");
+  const confirmClear = window.confirm(
+    "Tem certeza que deseja limpar todo o histórico?"
+  );
 
-      await fetchHistory();
-
-      toast.success(
-        "Histórico limpo com sucesso"
-      );
-    } catch (error) {
-      console.error(error);
-
-      toast.error(
-        "Erro ao limpar histórico"
-      );
-    }
+  if (!confirmClear) {
+    return;
   }
+
+  try {
+    await api.delete("/scraper/history");
+    await fetchHistory();
+    toast.success("Histórico limpo com sucesso");
+  } catch (error) {
+    console.error(error);
+    toast.error("Erro ao limpar histórico");
+  }
+}
 
   function exportFile(type) {
     window.open(
