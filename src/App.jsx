@@ -24,7 +24,6 @@ function App() {
   const [loading, setLoading] = useState(false);
 
   const user = {
-    name: "Miguel",
     email: "migueldhein50@gmail.com",
   };
 
@@ -40,7 +39,7 @@ function App() {
 
   async function fetchMonitors() {
     try {
-      const response = await api.get("/monitor/list");
+      const response = await api.get("/api/monitor/list");
       setMonitors(response.data);
     } catch (error) {
       console.error(error);
@@ -92,7 +91,7 @@ function App() {
     }
 
     try {
-      await api.post(`/monitor/add?url=${encodeURIComponent(finalUrl)}`);
+      await api.post(`/api/monitor/add?url=${encodeURIComponent(finalUrl)}`);
       setMonitorUrl("");
       await fetchMonitors();
       toast.success("Monitor criado com sucesso!");
@@ -104,7 +103,7 @@ function App() {
 
   async function deleteMonitor(id) {
     try {
-      await api.delete(`/monitor/${id}`);
+      await api.delete(`/api/monitor/${id}`);
       await fetchMonitors();
       toast.success("Monitor removido");
     } catch (error) {
@@ -142,7 +141,7 @@ function App() {
   }
 
   function exportFile(type) {
-    window.open(`${API_ROOT}/api/scraper/export/${type}`, "_blank");
+    window.open(`${API_ROOT}/scraper/export/${type}`, "_blank");
   }
 
   const chartData = useMemo(() => {
@@ -180,11 +179,14 @@ function App() {
           animate={{ opacity: 1, y: 0 }}
         >
           <div className="hero-mini">WEBHARVEST PRO</div>
+
           <h2>Painel inteligente de raspagem</h2>
+
           <p>
             Automatize extrações, gere relatórios, monitore sites e visualize
             previews em tempo real.
           </p>
+
           <div className="hero-badge">● API Online</div>
         </motion.section>
 
@@ -288,7 +290,22 @@ function App() {
             ) : (
               monitors.map((monitor) => (
                 <div className="monitor-card" key={monitor.id}>
-                  <span>{monitor.url}</span>
+                  <div>
+                    <span>{monitor.url}</span>
+                    <p
+                      style={{
+                        color:
+                          monitor.last_status === "online"
+                            ? "#22c55e"
+                            : "#ef4444",
+                        marginTop: "8px",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      ● {monitor.last_status}
+                    </p>
+                  </div>
+
                   <button onClick={() => deleteMonitor(monitor.id)}>
                     Remover
                   </button>
@@ -329,6 +346,7 @@ function App() {
               <button className="refresh-btn" onClick={fetchHistory}>
                 Atualizar
               </button>
+
               <button className="clear-btn" onClick={clearHistory}>
                 Limpar histórico
               </button>
@@ -344,7 +362,7 @@ function App() {
                   {item.screenshot_url ? (
                     <img
                       src={`${API_ROOT}${item.screenshot_url}`}
-                      alt={item.title}
+                      alt={item.title || "Preview"}
                     />
                   ) : (
                     <div className="empty-state">Sem preview</div>
@@ -352,7 +370,8 @@ function App() {
 
                   <div className="history-content">
                     <h3>{item.title}</h3>
-                    <p>{item.description}</p>
+
+                    {item.description && <p>{item.description}</p>}
 
                     <div className="history-footer">
                       <a href={item.url} target="_blank" rel="noreferrer">
