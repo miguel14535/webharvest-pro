@@ -1,17 +1,34 @@
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
-import toast, { Toaster } from "react-hot-toast";
+import {
+  LayoutDashboard,
+  FileSearch,
+  Activity,
+  FileBarChart2,
+  Settings,
+  LogOut,
+  Database,
+  Monitor,
+  ShieldCheck,
+  User,
+  Eye,
+  Trash2,
+  RefreshCcw,
+  Rocket,
+} from "lucide-react";
+
 import {
   ResponsiveContainer,
   AreaChart,
   Area,
   XAxis,
   YAxis,
-  Tooltip,
   CartesianGrid,
+  Tooltip,
 } from "recharts";
 
+import toast, { Toaster } from "react-hot-toast";
 import api from "./services/api";
+
 import "./App.css";
 
 const API_ROOT = "https://webharvest-pro.onrender.com";
@@ -19,20 +36,17 @@ const API_ROOT = "https://webharvest-pro.onrender.com";
 function App() {
   const [url, setUrl] = useState("");
   const [monitorUrl, setMonitorUrl] = useState("");
+
   const [history, setHistory] = useState([]);
   const [monitors, setMonitors] = useState([]);
-  const [loading, setLoading] = useState(false);
 
-  const user = {
-    email: "migueldhein50@gmail.com",
-  };
+  const [loading, setLoading] = useState(false);
 
   async function fetchHistory() {
     try {
       const response = await api.get("/scraper/history");
       setHistory(response.data);
     } catch (error) {
-      console.error(error);
       toast.error("Erro ao carregar histórico");
     }
   }
@@ -42,7 +56,6 @@ function App() {
       const response = await api.get("/api/monitor/list");
       setMonitors(response.data);
     } catch (error) {
-      console.error(error);
       toast.error("Erro ao carregar monitores");
     }
   }
@@ -58,21 +71,29 @@ function App() {
       return;
     }
 
-    let finalUrl = url.trim();
-
-    if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
-      finalUrl = `https://${finalUrl}`;
-    }
-
     try {
       setLoading(true);
-      await api.get(`/scraper/scrape?url=${encodeURIComponent(finalUrl)}`);
+
+      let finalUrl = url;
+
+      if (
+        !finalUrl.startsWith("http://") &&
+        !finalUrl.startsWith("https://")
+      ) {
+        finalUrl = `https://${finalUrl}`;
+      }
+
+      await api.get(
+        `/scraper/scrape?url=${encodeURIComponent(finalUrl)}`
+      );
+
+      toast.success("Extração realizada!");
+
       setUrl("");
-      await fetchHistory();
-      toast.success("Extração realizada com sucesso!");
+
+      fetchHistory();
     } catch (error) {
-      console.error(error);
-      toast.error("Erro ao realizar extração");
+      toast.error("Erro ao extrair site");
     } finally {
       setLoading(false);
     }
@@ -80,68 +101,62 @@ function App() {
 
   async function addMonitor() {
     if (!monitorUrl.trim()) {
-      toast.error("Digite uma URL para monitorar");
+      toast.error("Digite uma URL");
       return;
     }
 
-    let finalUrl = monitorUrl.trim();
-
-    if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
-      finalUrl = `https://${finalUrl}`;
-    }
-
     try {
-      await api.post(`/api/monitor/add?url=${encodeURIComponent(finalUrl)}`);
+      let finalUrl = monitorUrl;
+
+      if (
+        !finalUrl.startsWith("http://") &&
+        !finalUrl.startsWith("https://")
+      ) {
+        finalUrl = `https://${finalUrl}`;
+      }
+
+      await api.post(
+        `/api/monitor/add?url=${encodeURIComponent(finalUrl)}`
+      );
+
+      toast.success("Monitor criado");
+
       setMonitorUrl("");
-      await fetchMonitors();
-      toast.success("Monitor criado com sucesso!");
-    } catch (error) {
-      console.error(error);
-      toast.error("Erro ao criar monitor");
-    }
-  }
 
-  async function deleteMonitor(id) {
-    try {
-      await api.delete(`/api/monitor/${id}`);
-      await fetchMonitors();
-      toast.success("Monitor removido");
+      fetchMonitors();
     } catch (error) {
-      console.error(error);
-      toast.error("Erro ao remover monitor");
+      toast.error("Erro ao criar monitor");
     }
   }
 
   async function deleteItem(id) {
     try {
       await api.delete(`/scraper/history/${id}`);
-      await fetchHistory();
-      toast.success("Registro excluído");
+
+      toast.success("Registro removido");
+
+      fetchHistory();
     } catch (error) {
-      console.error(error);
-      toast.error("Erro ao excluir registro");
+      toast.error("Erro ao remover");
     }
   }
 
   async function clearHistory() {
     const confirmClear = window.confirm(
-      "Tem certeza que deseja limpar todo o histórico?"
+      "Deseja realmente limpar o histórico?"
     );
 
     if (!confirmClear) return;
 
     try {
       await api.delete("/scraper/history");
-      await fetchHistory();
-      toast.success("Histórico limpo com sucesso");
-    } catch (error) {
-      console.error(error);
-      toast.error("Erro ao limpar histórico");
-    }
-  }
 
-  function exportFile(type) {
-    window.open(`${API_ROOT}/scraper/export/${type}`, "_blank");
+      toast.success("Histórico limpo");
+
+      fetchHistory();
+    } catch (error) {
+      toast.error("Erro ao limpar");
+    }
   }
 
   const chartData = useMemo(() => {
@@ -150,91 +165,204 @@ function App() {
       .reverse()
       .map((item, index) => ({
         name: `#${item.id}`,
-        extrações: index + 1,
+        extrações: index + 3,
       }));
   }, [history]);
 
   return (
-    <div className="app-shell">
+    <div className="dashboard">
       <Toaster position="top-right" />
 
+      {/* SIDEBAR */}
+
       <aside className="sidebar">
-        <div className="logo">
-          <h1>WebHarvest</h1>
-          <span>Inteligência de Extração de Dados</span>
+        <div className="logo-box">
+          <div className="logo-icon">
+            <Rocket size={28} />
+          </div>
+
+          <div>
+            <h1>WebHarvest</h1>
+            <span>Inteligência de Extração</span>
+          </div>
         </div>
 
         <nav className="menu">
-          <button>Painel</button>
-          <button>Extrações</button>
-          <button>Monitoramento</button>
-          <button>Relatórios</button>
+          <button className="active">
+            <LayoutDashboard size={20} />
+            Painel
+          </button>
+
+          <button>
+            <FileSearch size={20} />
+            Extrações
+          </button>
+
+          <button>
+            <Activity size={20} />
+            Monitoramento
+          </button>
+
+          <button>
+            <FileBarChart2 size={20} />
+            Relatórios
+          </button>
+
+          <button>
+            <Settings size={20} />
+            Configurações
+          </button>
         </nav>
+
+        <div className="sidebar-user">
+          <div className="avatar">M</div>
+
+          <div>
+            <h4>Miguel</h4>
+            <span>migueldhein50@gmail.com</span>
+          </div>
+
+          <div className="jwt-badge">● JWT ativo</div>
+        </div>
+
+        <button className="logout-btn">
+          <LogOut size={18} />
+          Sair
+        </button>
       </aside>
 
+      {/* MAIN */}
+
       <main className="main-content">
-        <motion.section
-          className="hero"
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div className="hero-mini">WEBHARVEST PRO</div>
+        {/* HERO */}
 
-          <h2>Painel inteligente de raspagem</h2>
+        <section className="hero-card">
+          <div>
+            <small>WEBHARVEST PRO</small>
 
-          <p>
-            Automatize extrações, gere relatórios, monitore sites e visualize
-            previews em tempo real.
-          </p>
+            <h2>Painel inteligente de raspagem</h2>
 
-          <div className="hero-badge">● API Online</div>
-        </motion.section>
-
-        <section className="stats-grid">
-          <div className="stat-card">
-            <h4>Raspagens</h4>
-            <h3>{history.length}</h3>
-            <p>registros salvos</p>
+            <p>
+              Automatize extrações, gere relatórios, monitore
+              sites e visualize resultados em tempo real.
+            </p>
           </div>
 
-          <div className="stat-card">
-            <h4>Monitores</h4>
-            <h3>{monitors.length}</h3>
-            <p>sites acompanhados</p>
-          </div>
-
-          <div className="stat-card">
-            <h4>Status</h4>
-            <h3>Online</h3>
-            <p>FastAPI operacional</p>
-          </div>
-
-          <div className="stat-card">
-            <h4>Usuário</h4>
-            <p>{user.email}</p>
+          <div className="api-status">
+            <span className="online-dot"></span>
+            API Online
+            <small>FastAPI operacional</small>
           </div>
         </section>
 
-        <section className="content-grid">
-          <div className="panel">
-            <div className="panel-header">
-              <h3>Análises</h3>
-              <span className="panel-tag">Tempo real</span>
+        {/* STATS */}
+
+        <section className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-icon purple">
+              <Database />
             </div>
 
-            <div className="chart-container">
-              <ResponsiveContainer>
+            <div>
+              <span>RASPAGENS</span>
+              <h3>{history.length}</h3>
+              <p>registros salvos</p>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon blue">
+              <Monitor />
+            </div>
+
+            <div>
+              <span>MONITORES</span>
+              <h3>{monitors.length}</h3>
+              <p>sites acompanhados</p>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon green">
+              <ShieldCheck />
+            </div>
+
+            <div>
+              <span>STATUS</span>
+              <h3 className="online-text">On-line</h3>
+              <p>API operacional</p>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon purple">
+              <User />
+            </div>
+
+            <div>
+              <span>USUÁRIO</span>
+              <h4>migueldhein50@gmail.com</h4>
+              <p>JWT ativo</p>
+            </div>
+          </div>
+        </section>
+
+        {/* CONTENT */}
+
+        <section className="content-grid">
+          {/* CHART */}
+
+          <div className="panel chart-panel">
+            <div className="panel-header">
+              <h3>Análises</h3>
+
+              <span className="tag">Tempo real</span>
+            </div>
+
+            <p>Últimas raspagens realizadas</p>
+
+            <div className="chart-wrapper">
+              <ResponsiveContainer width="100%" height={260}>
                 <AreaChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#26314f" />
+                  <defs>
+                    <linearGradient
+                      id="colorUv"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="5%"
+                        stopColor="#8b5cf6"
+                        stopOpacity={0.8}
+                      />
+
+                      <stop
+                        offset="95%"
+                        stopColor="#8b5cf6"
+                        stopOpacity={0}
+                      />
+                    </linearGradient>
+                  </defs>
+
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="#1e293b"
+                  />
+
                   <XAxis dataKey="name" stroke="#94a3b8" />
+
                   <YAxis stroke="#94a3b8" />
+
                   <Tooltip />
+
                   <Area
                     type="monotone"
                     dataKey="extrações"
-                    stroke="#7b61ff"
-                    fill="#7b61ff"
-                    fillOpacity={0.35}
+                    stroke="#8b5cf6"
+                    fillOpacity={1}
+                    fill="url(#colorUv)"
                     strokeWidth={4}
                   />
                 </AreaChart>
@@ -242,154 +370,195 @@ function App() {
             </div>
           </div>
 
+          {/* SCRAPER */}
+
           <div className="panel">
             <div className="panel-header">
               <h3>Nova extração</h3>
             </div>
 
-            <p>Capture título, descrição, links e screenshot.</p>
+            <p>
+              Capture título, descrição, links e captura de tela.
+            </p>
 
-            <div className="scrape-form">
+            <div className="input-group">
               <input
+                type="text"
                 placeholder="https://github.com"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
               />
 
-              <button onClick={handleScrape} disabled={loading}>
-                {loading ? "Extraindo..." : "Executar"}
+              <button onClick={handleScrape}>
+                {loading ? "..." : "Executar"}
               </button>
             </div>
 
             <div className="preview-box">
-              <h4>Pré-visualização</h4>
-              <p>Cada raspagem gera uma imagem do site e salva no histórico.</p>
+              <Eye size={20} />
+
+              <div>
+                <h4>Pré-visualização</h4>
+
+                <p>
+                  Cada raspagem gera uma imagem do site e salva no
+                  histórico.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* MONITOR */}
+
+          <div className="panel">
+            <div className="panel-header">
+              <h3>Monitoramento</h3>
+
+              <span className="tag">
+                {monitors.length} ativos
+              </span>
+            </div>
+
+            <p>
+              Cadastre sites para acompanhar disponibilidade.
+            </p>
+
+            <div className="input-group">
+              <input
+                type="text"
+                placeholder="https://site.com"
+                value={monitorUrl}
+                onChange={(e) => setMonitorUrl(e.target.value)}
+              />
+
+              <button onClick={addMonitor}>
+                Monitorar
+              </button>
+            </div>
+
+            <div className="empty-monitor">
+              Nenhum site monitorado ainda.
             </div>
           </div>
         </section>
 
-        <section className="panel monitor-section">
-          <div className="panel-header">
-            <h3>Monitoramento</h3>
-            <span className="panel-tag">{monitors.length} ativos</span>
-          </div>
+        {/* HISTORY + REPORTS */}
 
-          <div className="scrape-form">
-            <input
-              placeholder="https://site.com"
-              value={monitorUrl}
-              onChange={(e) => setMonitorUrl(e.target.value)}
-            />
+        <section className="bottom-grid">
+          {/* HISTORY */}
 
-            <button onClick={addMonitor}>Monitorar</button>
-          </div>
+          <div className="panel">
+            <div className="panel-header">
+              <h3>Histórico de extrações</h3>
 
-          <div className="monitor-list">
-            {monitors.length === 0 ? (
-              <div className="empty-state">Nenhum site monitorado ainda.</div>
-            ) : (
-              monitors.map((monitor) => (
-                <div className="monitor-card" key={monitor.id}>
-                  <div>
-                    <span>{monitor.url}</span>
-                    <p
-                      style={{
-                        color:
-                          monitor.last_status === "online"
-                            ? "#22c55e"
-                            : "#ef4444",
-                        marginTop: "8px",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      ● {monitor.last_status}
-                    </p>
-                  </div>
+              <div className="history-actions">
+                <button
+                  className="refresh-btn"
+                  onClick={fetchHistory}
+                >
+                  <RefreshCcw size={16} />
+                  Atualizar
+                </button>
 
-                  <button onClick={() => deleteMonitor(monitor.id)}>
-                    Remover
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section className="panel">
-          <div className="panel-header">
-            <h3>Relatórios</h3>
-          </div>
-
-          <div className="export-grid">
-            <button className="export-pdf" onClick={() => exportFile("pdf")}>
-              Exportar PDF
-            </button>
-
-            <button
-              className="export-excel"
-              onClick={() => exportFile("excel")}
-            >
-              Exportar Excel
-            </button>
-
-            <button className="export-json" onClick={() => exportFile("json")}>
-              Exportar JSON
-            </button>
-          </div>
-        </section>
-
-        <section className="history-section">
-          <div className="history-header">
-            <h2>Histórico de extrações</h2>
-
-            <div className="history-actions">
-              <button className="refresh-btn" onClick={fetchHistory}>
-                Atualizar
-              </button>
-
-              <button className="clear-btn" onClick={clearHistory}>
-                Limpar histórico
-              </button>
+                <button
+                  className="danger-btn"
+                  onClick={clearHistory}
+                >
+                  <Trash2 size={16} />
+                  Limpar histórico
+                </button>
+              </div>
             </div>
-          </div>
 
-          {history.length === 0 ? (
-            <div className="empty-state">Nenhuma extração realizada.</div>
-          ) : (
+            <p>
+              Visualize previews, descrições e URLs coletadas.
+            </p>
+
             <div className="history-grid">
               {history.map((item) => (
-                <article className="history-card" key={item.id}>
-                  {item.screenshot_url ? (
-                    <img
-                      src={`${API_ROOT}${item.screenshot_url}`}
-                      alt={item.title || "Preview"}
-                    />
-                  ) : (
-                    <div className="empty-state">Sem preview</div>
-                  )}
+                <div className="history-card" key={item.id}>
+                  <img
+                    src={`${API_ROOT}${item.screenshot_url}`}
+                    alt={item.title}
+                  />
 
-                  <div className="history-content">
-                    <h3>{item.title}</h3>
+                  <div className="history-info">
+                    <span className="history-id">
+                      #{item.id}
+                    </span>
 
-                    {item.description && <p>{item.description}</p>}
+                    <h4>{item.title}</h4>
+
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {item.url}
+                    </a>
 
                     <div className="history-footer">
-                      <a href={item.url} target="_blank" rel="noreferrer">
-                        Acessar site
-                      </a>
+                      <span>
+                        Hoje,{" "}
+                        {new Date().toLocaleTimeString("pt-BR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
 
                       <button
-                        className="delete-history"
                         onClick={() => deleteItem(item.id)}
                       >
-                        Excluir
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </div>
-                </article>
+                </div>
               ))}
             </div>
-          )}
+          </div>
+
+          {/* REPORTS */}
+
+          <div className="panel reports-panel">
+            <div className="panel-header">
+              <h3>Relatórios</h3>
+            </div>
+
+            <p>Exporte os dados coletados.</p>
+
+            <div className="reports-grid">
+              <button
+                onClick={() =>
+                  window.open(
+                    `${API_ROOT}/scraper/export/pdf`
+                  )
+                }
+              >
+                Exportar PDF
+              </button>
+
+              <button
+                onClick={() =>
+                  window.open(
+                    `${API_ROOT}/scraper/export/excel`
+                  )
+                }
+              >
+                Exportar Excel
+              </button>
+
+              <button
+                onClick={() =>
+                  window.open(
+                    `${API_ROOT}/scraper/export/json`
+                  )
+                }
+              >
+                Exportar JSON
+              </button>
+            </div>
+          </div>
         </section>
       </main>
     </div>
